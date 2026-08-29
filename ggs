@@ -1,0 +1,406 @@
+--[[
+    scripted by blix
+]]
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Chat = game:GetService("Chat")
+local StarterGui = game:GetService("StarterGui")
+local TextChatService = game:GetService("TextChatService")
+local LocalPlayer = Players.LocalPlayer
+
+local unloaded = false
+local guiVisible = true
+local toggleKey = Enum.KeyCode.LeftControl
+local selected = {}
+local allSelected = false
+local rowRefs = {}
+local checkRefs = {}
+
+-- Official Roblox chat name colors
+local CHAT_NAME_COLORS = {
+    Color3.fromRGB(253, 41, 67),   -- Bright red
+    Color3.fromRGB(1, 162, 255),   -- Bright blue
+    Color3.fromRGB(2, 184, 87),    -- Earth green
+    Color3.fromRGB(107, 50, 124),  -- Bright violet
+    Color3.fromRGB(218, 133, 65),  -- Bright orange
+    Color3.fromRGB(245, 205, 48),  -- Bright yellow
+    Color3.fromRGB(232, 186, 200), -- Light reddish violet
+    Color3.fromRGB(215, 197, 154), -- Brick yellow
+}
+
+local function getNameColor(userId)
+    return CHAT_NAME_COLORS[(userId % #CHAT_NAME_COLORS) + 1]
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BlixPlayerSelect"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -50, 0, 32)
+Title.Position = UDim2.new(0, 14, 0, 8)
+Title.BackgroundTransparency = 1
+Title.Text = "Blix  |  Players"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+CloseBtn.Position = UDim2.new(1, -38, 0, 10)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 55, 55)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.ZIndex = 5
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+local CountLabel = Instance.new("TextLabel")
+CountLabel.Size = UDim2.new(1, -28, 0, 18)
+CountLabel.Position = UDim2.new(0, 14, 0, 42)
+CountLabel.BackgroundTransparency = 1
+CountLabel.Text = "Selected: 0"
+CountLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+CountLabel.Font = Enum.Font.Gotham
+CountLabel.TextSize = 12
+CountLabel.TextXAlignment = Enum.TextXAlignment.Left
+CountLabel.Parent = MainFrame
+
+local TextBox = Instance.new("TextBox")
+TextBox.Size = UDim2.new(1, -108, 0, 34)
+TextBox.Position = UDim2.new(0, 14, 0, 64)
+TextBox.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+TextBox.BorderSizePixel = 0
+TextBox.PlaceholderText = "Type here..."
+TextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+TextBox.Text = ""
+TextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
+TextBox.Font = Enum.Font.Gotham
+TextBox.TextSize = 14
+TextBox.ClearTextOnFocus = false
+TextBox.TextXAlignment = Enum.TextXAlignment.Left
+TextBox.Parent = MainFrame
+Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0, 8)
+
+local TextPadding = Instance.new("UIPadding")
+TextPadding.PaddingLeft = UDim.new(0, 10)
+TextPadding.PaddingRight = UDim.new(0, 10)
+TextPadding.Parent = TextBox
+
+local SendBtn = Instance.new("TextButton")
+SendBtn.Size = UDim2.new(0, 72, 0, 34)
+SendBtn.Position = UDim2.new(1, -86, 0, 64)
+SendBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+SendBtn.BorderSizePixel = 0
+SendBtn.Text = "Send"
+SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendBtn.Font = Enum.Font.GothamBold
+SendBtn.TextSize = 14
+SendBtn.Parent = MainFrame
+Instance.new("UICorner", SendBtn).CornerRadius = UDim.new(0, 8)
+
+local SelectAllBtn = Instance.new("TextButton")
+SelectAllBtn.Size = UDim2.new(1, -28, 0, 34)
+SelectAllBtn.Position = UDim2.new(0, 14, 0, 106)
+SelectAllBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SelectAllBtn.BorderSizePixel = 0
+SelectAllBtn.Text = "Select All"
+SelectAllBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+SelectAllBtn.Font = Enum.Font.Gotham
+SelectAllBtn.TextSize = 14
+SelectAllBtn.Parent = MainFrame
+Instance.new("UICorner", SelectAllBtn).CornerRadius = UDim.new(0, 8)
+
+local ListFrame = Instance.new("ScrollingFrame")
+ListFrame.Size = UDim2.new(1, -28, 1, -156)
+ListFrame.Position = UDim2.new(0, 14, 0, 148)
+ListFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+ListFrame.BorderSizePixel = 0
+ListFrame.ScrollBarThickness = 4
+ListFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+ListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ListFrame.Parent = MainFrame
+Instance.new("UICorner", ListFrame).CornerRadius = UDim.new(0, 8)
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.Parent = ListFrame
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 6)
+Padding.PaddingBottom = UDim.new(0, 6)
+Padding.PaddingLeft = UDim.new(0, 6)
+Padding.PaddingRight = UDim.new(0, 6)
+Padding.Parent = ListFrame
+
+local function updateCanvas()
+    ListFrame.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 16)
+end
+
+local function updateCount()
+    local n = 0
+    for _ in pairs(selected) do
+        n = n + 1
+    end
+    CountLabel.Text = "Selected: " .. tostring(n)
+
+    local total = 0
+    for _ in pairs(rowRefs) do
+        total = total + 1
+    end
+    allSelected = (total > 0 and n == total)
+    SelectAllBtn.Text = allSelected and "Deselect All" or "Select All"
+end
+
+local function setRowVisual(userId, on)
+    local row = rowRefs[userId]
+    local check = checkRefs[userId]
+    if not row or not check then return end
+    if on then
+        row.BackgroundColor3 = Color3.fromRGB(55, 90, 140)
+        check.Text = "✓"
+        check.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        row.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+        check.Text = ""
+        check.TextColor3 = Color3.fromRGB(180, 180, 180)
+    end
+end
+
+local function togglePlayer(userId)
+    if selected[userId] then
+        selected[userId] = nil
+        setRowVisual(userId, false)
+    else
+        selected[userId] = true
+        setRowVisual(userId, true)
+    end
+    updateCount()
+end
+
+local function playerLabel(plr)
+    local display = plr.DisplayName
+    local name = plr.Name
+    if display == name then
+        return "@" .. name
+    end
+    return display .. "  @" .. name
+end
+
+local function getSelectedPlayers()
+    local list = {}
+    for userId in pairs(selected) do
+        local plr = Players:GetPlayerByUserId(userId)
+        if plr then
+            table.insert(list, plr)
+        end
+    end
+    return list
+end
+
+local function makeRow(plr)
+    if unloaded then return end
+    if rowRefs[plr.UserId] then return end
+
+    local row = Instance.new("TextButton")
+    row.Name = "Player_" .. tostring(plr.UserId)
+    row.Size = UDim2.new(1, -4, 0, 32)
+    row.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+    row.BorderSizePixel = 0
+    row.Text = ""
+    row.AutoButtonColor = false
+    row.LayoutOrder = string.lower(plr.Name):byte(1) or 0
+    row.Parent = ListFrame
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+    local check = Instance.new("TextLabel")
+    check.Name = "Check"
+    check.Size = UDim2.new(0, 24, 1, 0)
+    check.Position = UDim2.new(0, 6, 0, 0)
+    check.BackgroundTransparency = 1
+    check.Text = ""
+    check.TextColor3 = Color3.fromRGB(180, 180, 180)
+    check.Font = Enum.Font.GothamBold
+    check.TextSize = 14
+    check.Parent = row
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, -40, 1, 0)
+    nameLabel.Position = UDim2.new(0, 32, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = playerLabel(plr)
+    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 13
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    nameLabel.Parent = row
+
+    rowRefs[plr.UserId] = row
+    checkRefs[plr.UserId] = check
+
+    if selected[plr.UserId] then
+        setRowVisual(plr.UserId, true)
+    end
+
+    row.MouseButton1Click:Connect(function()
+        if unloaded then return end
+        togglePlayer(plr.UserId)
+    end)
+
+    updateCanvas()
+end
+
+local function removeRow(userId)
+    local row = rowRefs[userId]
+    if row then
+        row:Destroy()
+    end
+    rowRefs[userId] = nil
+    checkRefs[userId] = nil
+    selected[userId] = nil
+    updateCanvas()
+    updateCount()
+end
+
+local function rebuildList()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        makeRow(plr)
+    end
+    updateCanvas()
+    updateCount()
+end
+
+-- Normal distance bubble
+local function fakeBubble(plr, text)
+    if not plr or not plr.Character then return end
+    local head = plr.Character:FindFirstChild("Head")
+    if not head then return end
+
+    pcall(function()
+        Chat:Chat(head, text, Enum.ChatColor.White)
+    end)
+end
+
+-- Show in chat with the player's real name color
+local function fakeChatMessage(plr, text)
+    local nameColor = getNameColor(plr.UserId)
+
+    pcall(function()
+        StarterGui:SetCore("ChatMakeSystemMessage", {
+            Text = plr.DisplayName .. ": " .. text,
+            Color = nameColor,
+            Font = Enum.Font.SourceSansBold,
+            TextSize = 18
+        })
+    end)
+
+    pcall(function()
+        local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then
+            channel:DisplaySystemMessage(plr.DisplayName .. ": " .. text)
+        end
+    end)
+end
+
+SendBtn.MouseButton1Click:Connect(function()
+    if unloaded then return end
+
+    local text = TextBox.Text
+    if text == "" then return end
+
+    local list = getSelectedPlayers()
+
+    for _, plr in ipairs(list) do
+        fakeBubble(plr, text)
+        fakeChatMessage(plr, text)
+    end
+
+    if getgenv().BlixOnSend then
+        getgenv().BlixOnSend(text, list)
+    end
+end)
+
+SelectAllBtn.MouseButton1Click:Connect(function()
+    if unloaded then return end
+    if allSelected then
+        for userId, _ in pairs(rowRefs) do
+            selected[userId] = nil
+            setRowVisual(userId, false)
+        end
+    else
+        for userId, _ in pairs(rowRefs) do
+            selected[userId] = true
+            setRowVisual(userId, true)
+        end
+    end
+    updateCount()
+end)
+
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+
+rebuildList()
+
+Players.PlayerAdded:Connect(function(plr)
+    task.wait(0.15)
+    if not unloaded then
+        makeRow(plr)
+        updateCount()
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    removeRow(plr.UserId)
+end)
+
+local function doUnload()
+    if unloaded then return end
+    unloaded = true
+    guiVisible = false
+    pcall(function()
+        ScreenGui:Destroy()
+    end)
+end
+
+CloseBtn.MouseButton1Click:Connect(doUnload)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if unloaded then return end
+    if input.KeyCode == toggleKey then
+        guiVisible = not guiVisible
+        MainFrame.Visible = guiVisible
+    end
+end)
+
+getgenv().BlixSelectedPlayers = getSelectedPlayers
+getgenv().BlixTextBoxText = function()
+    return TextBox.Text
+end
+
+-- scripted by blix
